@@ -23,8 +23,9 @@ const ImageViewManager = NativeModules.ImageViewManager;
 
 const RCTImageView = requireNativeComponent('RCTImageView');
 
-import type {ImageStyleProp} from 'StyleSheet';
 import type {ImageProps as ImagePropsType} from 'ImageProps';
+
+import type {ImageStyleProp} from 'StyleSheet';
 
 function getSize(
   uri: string,
@@ -47,7 +48,7 @@ function prefetch(url: string) {
 
 async function queryCache(
   urls: Array<string>,
-): Promise<Map<string, 'memory' | 'disk'>> {
+): Promise<Map<string, 'memory' | 'disk' | 'disk/memory'>> {
   return await ImageViewManager.queryCache(urls);
 }
 
@@ -123,6 +124,7 @@ let Image = (
 };
 
 Image = React.forwardRef(Image);
+Image.displayName = 'Image';
 
 /**
  * Retrieve the width and height (in pixels) of an image prior to displaying it.
