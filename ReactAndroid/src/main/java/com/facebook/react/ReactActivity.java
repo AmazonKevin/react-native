@@ -11,7 +11,7 @@ import javax.annotation.Nullable;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.view.KeyEvent;
 
 import com.facebook.react.modules.core.DefaultHardwareBackBtnHandler;
@@ -123,6 +123,12 @@ public abstract class ReactActivity extends AppCompatActivity
     String[] permissions,
     int[] grantResults) {
     mDelegate.onRequestPermissionsResult(requestCode, permissions, grantResults);
+  }
+
+  @Override
+  public void onWindowFocusChanged(boolean hasFocus) {
+    super.onWindowFocusChanged(hasFocus);
+    mDelegate.onWindowFocusChanged(hasFocus);
   }
 
   protected final ReactNativeHost getReactNativeHost() {

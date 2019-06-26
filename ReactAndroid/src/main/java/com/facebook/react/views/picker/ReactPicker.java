@@ -8,22 +8,27 @@
 package com.facebook.react.views.picker;
 
 import android.content.Context;
-import android.support.v7.widget.AppCompatSpinner;
 import android.util.AttributeSet;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Spinner;
 
+import androidx.appcompat.widget.AppCompatSpinner;
+
 import com.facebook.react.common.annotations.VisibleForTesting;
+
+import java.util.List;
 
 import javax.annotation.Nullable;
 
 public class ReactPicker extends AppCompatSpinner {
 
   private int mMode = Spinner.MODE_DIALOG;
-  private @Nullable Integer mPrimaryColor;
   private @Nullable OnSelectListener mOnSelectListener;
+  private @Nullable List<ReactPickerItem> mItems;
+  private @Nullable List<ReactPickerItem> mStagedItems;
   private @Nullable Integer mStagedSelection;
+  private @Nullable Integer mStagedPrimaryTextColor;
 
   private final OnItemSelectedListener mItemSelectedListener = new OnItemSelectedListener() {
     @Override
@@ -111,41 +116,58 @@ public class ReactPicker extends AppCompatSpinner {
     return mOnSelectListener;
   }
 
+  /* package */ void setStagedItems(final @Nullable List<ReactPickerItem> items) {
+   mStagedItems = items;
+  }
+
   /**
-   * Will cache "selection" value locally and set it only once {@link #updateStagedSelection} is
+   * Will cache "selection" value locally and set it only once {@link #commitStagedData} is
    * called
    */
-  public void setStagedSelection(int selection) {
+  /* package */ void setStagedSelection(int selection) {
     mStagedSelection = selection;
   }
 
-  public void updateStagedSelection() {
-    if (mStagedSelection != null) {
-      setSelectionWithSuppressEvent(mStagedSelection);
-      mStagedSelection = null;
-    }
+  /* package */ void setStagedPrimaryTextColor(@Nullable Integer primaryColor) {
+    mStagedPrimaryTextColor = primaryColor;
   }
 
   /**
-   * Set the selection while suppressing the follow-up {@link OnSelectListener#onItemSelected(int)}
-   * event. This is used so we don't get an event when changing the selection ourselves.
-   *
-   * @param position the position of the selected item
+   * Used to commit staged data into ReactPicker view.
+   * During this period, we will disable {@link OnSelectListener#onItemSelected(int)} temporarily,
+   * so we don't get an event when changing the items/selection ourselves.
    */
-  private void setSelectionWithSuppressEvent(int position) {
-    if (position != getSelectedItemPosition()) {
-      setOnItemSelectedListener(null);
-      setSelection(position, false);
-      setOnItemSelectedListener(mItemSelectedListener);
+  /* package */ void commitStagedData() {
+    setOnItemSelectedListener(null);
+
+    ReactPickerAdapter adapter = (ReactPickerAdapter) getAdapter();
+    final int origSelection = getSelectedItemPosition();
+    if (mStagedItems != null && mStagedItems != mItems) {
+      mItems = mStagedItems;
+      mStagedItems = null;
+      if (adapter == null) {
+        adapter = new ReactPickerAdapter(getContext(), mItems);
+        setAdapter(adapter);
+      } else {
+        adapter.clear();
+        adapter.addAll(mItems);
+        adapter.notifyDataSetChanged();
+      }
     }
-  }
 
-  public @Nullable Integer getPrimaryColor() {
-    return mPrimaryColor;
-  }
+    if (mStagedSelection != null && mStagedSelection != origSelection) {
+      setSelection(mStagedSelection, false);
+      mStagedSelection = null;
+    }
 
-  public void setPrimaryColor(@Nullable Integer primaryColor) {
-    mPrimaryColor = primaryColor;
+    if (mStagedPrimaryTextColor != null &&
+        adapter != null &&
+        mStagedPrimaryTextColor != adapter.getPrimaryTextColor()) {
+      adapter.setPrimaryTextColor(mStagedPrimaryTextColor);
+      mStagedPrimaryTextColor = null;
+    }
+
+    setOnItemSelectedListener(mItemSelectedListener);
   }
 
   @VisibleForTesting

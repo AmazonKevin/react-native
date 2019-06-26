@@ -14,6 +14,7 @@
 #import <React/RCTUtils.h>
 #import <React/UIView+React.h>
 
+#import "RCTUIImageViewAnimated.h"
 #import "RCTImageBlurUtils.h"
 #import "RCTImageLoader.h"
 #import "RCTImageUtils.h"
@@ -78,11 +79,13 @@ static NSDictionary *onLoadParamsForSource(RCTImageSource *source)
 
   // Whether the latest change of props requires the image to be reloaded
   BOOL _needsReload;
+
+   RCTUIImageViewAnimated *_imageView;
 }
 
 - (instancetype)initWithBridge:(RCTBridge *)bridge
 {
-  if ((self = [super init])) {
+  if ((self = [super initWithFrame:CGRectZero])) {
     _bridge = bridge;
 
     NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
@@ -94,6 +97,9 @@ static NSDictionary *onLoadParamsForSource(RCTImageSource *source)
                selector:@selector(clearImageIfDetached)
                    name:UIApplicationDidEnterBackgroundNotification
                  object:nil];
+    _imageView = [[RCTUIImageViewAnimated alloc] init];
+    _imageView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [self addSubview:_imageView];
   }
   return self;
 }
@@ -105,10 +111,14 @@ static NSDictionary *onLoadParamsForSource(RCTImageSource *source)
 
 RCT_NOT_IMPLEMENTED(- (instancetype)init)
 
+RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
+
+RCT_NOT_IMPLEMENTED(- (instancetype)initWithFrame:(CGRect)frame)
+
 - (void)updateWithImage:(UIImage *)image
 {
   if (!image) {
-    super.image = nil;
+    _imageView.image = nil;
     return;
   }
 
@@ -125,10 +135,10 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   }
 
   // Apply trilinear filtering to smooth out mis-sized images
-  self.layer.minificationFilter = kCAFilterTrilinear;
-  self.layer.magnificationFilter = kCAFilterTrilinear;
+  _imageView.layer.minificationFilter = kCAFilterTrilinear;
+  _imageView.layer.magnificationFilter = kCAFilterTrilinear;
 
-  super.image = image;
+  _imageView.image = image;
 }
 
 - (void)setImage:(UIImage *)image
@@ -137,6 +147,10 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   if (image != self.image) {
     [self updateWithImage:image];
   }
+}
+
+- (UIImage *)image {
+  return _imageView.image;
 }
 
 - (void)setBlurRadius:(CGFloat)blurRadius
@@ -186,9 +200,9 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
     if (_resizeMode == RCTResizeModeRepeat) {
       // Repeat resize mode is handled by the UIImage. Use scale to fill
       // so the repeated image fills the UIImageView.
-      self.contentMode = UIViewContentModeScaleToFill;
+      _imageView.contentMode = UIViewContentModeScaleToFill;
     } else {
-      self.contentMode = (UIViewContentMode)resizeMode;
+      _imageView.contentMode = (UIViewContentMode)resizeMode;
     }
 
     if ([self shouldReloadImageSourceAfterResize]) {
@@ -211,7 +225,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
 - (void)clearImage
 {
   [self cancelImageLoad];
-  [self.layer removeAnimationForKey:@"contents"];
+  [_imageView.layer removeAnimationForKey:@"contents"];
   self.image = nil;
   _imageSource = nil;
 }
@@ -350,10 +364,16 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
       self->_pendingImageSource = nil;
     }
 
+    [self->_imageView.layer removeAnimationForKey:@"contents"];
     if (image.reactKeyframeAnimation) {
-      [self.layer addAnimation:image.reactKeyframeAnimation forKey:@"contents"];
+      CGImageRef posterImageRef = (__bridge CGImageRef)[image.reactKeyframeAnimation.values firstObject];
+      if (!posterImageRef) {
+        return;
+      }
+      // Apply renderingMode to animated image.
+      self->_imageView.image = [[UIImage imageWithCGImage:posterImageRef] imageWithRenderingMode:self->_renderingMode];
+      [self->_imageView.layer addAnimation:image.reactKeyframeAnimation forKey:@"contents"];
     } else {
-      [self.layer removeAnimationForKey:@"contents"];
       self.image = image;
     }
 

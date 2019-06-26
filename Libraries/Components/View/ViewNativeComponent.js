@@ -10,14 +10,14 @@
 
 'use strict';
 
-const ReactNative = require('ReactNative');
+const ReactNative = require('../../Renderer/shims/ReactNative');
 
-const requireNativeComponent = require('requireNativeComponent');
+const requireNativeComponent = require('../../ReactNative/requireNativeComponent');
 
-import type {ViewProps} from 'ViewPropTypes';
+import type {ViewProps} from './ViewPropTypes';
 
 type ViewNativeComponentType = Class<ReactNative.NativeComponent<ViewProps>>;
 
-const NativeViewComponent = requireNativeComponent('RCTView');
-
-module.exports = ((NativeViewComponent: any): ViewNativeComponentType);
+export default ((requireNativeComponent(
+  'RCTView',
+): any): ViewNativeComponentType);

@@ -28,9 +28,24 @@
 #import "RCTValueAnimatedNode.h"
 #import "RCTTrackingAnimatedNode.h"
 
+// We do some normalizing of the event names in RCTEventDispatcher#RCTNormalizeInputEventName.
+// To make things simpler just get rid of the parts we change in the event names we use here.
+// This is a lot easier than trying to denormalize because there would be multiple possible
+// denormalized forms for a single input.
+static NSString *RCTNormalizeAnimatedEventName(NSString *eventName)
+{
+  if ([eventName hasPrefix:@"on"]) {
+    return [eventName substringFromIndex:2];
+  }
+  if ([eventName hasPrefix:@"top"]) {
+    return [eventName substringFromIndex:3];
+  }
+  return eventName;
+}
+
 @implementation RCTNativeAnimatedNodesManager
 {
-  __weak RCTUIManager *_uiManager;
+  __weak RCTBridge *_bridge;
   NSMutableDictionary<NSNumber *, RCTAnimatedNode *> *_animationNodes;
   // Mapping of a view tag and an event name to a list of event animation drivers. 99% of the time
   // there will be only one driver per mapping so all code code should be optimized around that.
@@ -39,15 +54,24 @@
   CADisplayLink *_displayLink;
 }
 
-- (instancetype)initWithUIManager:(nonnull RCTUIManager *)uiManager
+- (instancetype)initWithBridge:(nonnull RCTBridge *)bridge
 {
   if ((self = [super init])) {
-    _uiManager = uiManager;
+    _bridge = bridge;
     _animationNodes = [NSMutableDictionary new];
     _eventDrivers = [NSMutableDictionary new];
     _activeAnimations = [NSMutableSet new];
   }
   return self;
+}
+
+- (BOOL)isNodeManagedByFabric:(nonnull NSNumber *)tag
+{
+  RCTAnimatedNode *node = _animationNodes[tag];
+  if (node) {
+    return [node isManagedByFabric];
+  }
+  return false;
 }
 
 #pragma mark -- Graph
@@ -124,7 +148,7 @@
 {
   RCTAnimatedNode *node = _animationNodes[nodeTag];
   if ([node isKindOfClass:[RCTPropsAnimatedNode class]]) {
-    [(RCTPropsAnimatedNode *)node connectToView:viewTag viewName:viewName uiManager:_uiManager];
+    [(RCTPropsAnimatedNode *)node connectToView:viewTag viewName:viewName bridge:_bridge];
   }
   [node setNeedsUpdate];
 }
@@ -315,7 +339,7 @@
   RCTEventAnimation *driver =
     [[RCTEventAnimation alloc] initWithEventPath:eventPath valueNode:(RCTValueAnimatedNode *)node];
 
-  NSString *key = [NSString stringWithFormat:@"%@%@", viewTag, eventName];
+  NSString *key = [NSString stringWithFormat:@"%@%@", viewTag, RCTNormalizeAnimatedEventName(eventName)];
   if (_eventDrivers[key] != nil) {
     [_eventDrivers[key] addObject:driver];
   } else {
@@ -329,7 +353,7 @@
                           eventName:(nonnull NSString *)eventName
                     animatedNodeTag:(nonnull NSNumber *)animatedNodeTag
 {
-  NSString *key = [NSString stringWithFormat:@"%@%@", viewTag, eventName];
+  NSString *key = [NSString stringWithFormat:@"%@%@", viewTag, RCTNormalizeAnimatedEventName(eventName)];
   if (_eventDrivers[key] != nil) {
     if (_eventDrivers[key].count == 1) {
       [_eventDrivers removeObjectForKey:key];
@@ -351,7 +375,7 @@
     return;
   }
 
-  NSString *key = [NSString stringWithFormat:@"%@%@", event.viewTag, event.eventName];
+  NSString *key = [NSString stringWithFormat:@"%@%@", event.viewTag, RCTNormalizeAnimatedEventName(event.eventName)];
   NSMutableArray<RCTEventAnimation *> *driversForKey = _eventDrivers[key];
   if (driversForKey) {
     for (RCTEventAnimation *driver in driversForKey) {

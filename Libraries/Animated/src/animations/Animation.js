@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const NativeAnimatedHelper = require('NativeAnimatedHelper');
+const NativeAnimatedHelper = require('../NativeAnimatedHelper');
 
 import type AnimatedValue from '../nodes/AnimatedValue';
 
@@ -56,7 +56,9 @@ class Animation {
     onEnd && onEnd(result);
   }
   __startNativeAnimation(animatedValue: AnimatedValue): void {
+    NativeAnimatedHelper.API.enableQueue();
     animatedValue.__makeNative();
+    NativeAnimatedHelper.API.disableQueue();
     this.__nativeId = NativeAnimatedHelper.generateNewAnimationId();
     NativeAnimatedHelper.API.startAnimatingNode(
       this.__nativeId,

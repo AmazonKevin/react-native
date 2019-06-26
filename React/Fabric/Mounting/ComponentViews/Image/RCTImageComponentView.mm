@@ -8,14 +8,13 @@
 #import "RCTImageComponentView.h"
 
 #import <React/RCTImageResponseObserverProxy.h>
+#import <react/components/image/ImageComponentDescriptor.h>
 #import <react/components/image/ImageEventEmitter.h>
 #import <react/components/image/ImageLocalData.h>
 #import <react/components/image/ImageProps.h>
-#import <react/components/image/ImageShadowNode.h>
 #import <react/imagemanager/ImageRequest.h>
 #import <react/imagemanager/RCTImagePrimitivesConversions.h>
 
-#import "MainQueueExecutor.h"
 #import "RCTConversions.h"
 
 @implementation RCTImageComponentView {
@@ -46,17 +45,15 @@
 
 #pragma mark - RCTComponentViewProtocol
 
-+ (ComponentHandle)componentHandle
++ (ComponentDescriptorProvider)componentDescriptorProvider
 {
-  return ImageShadowNode::Handle();
+  return concreteComponentDescriptorProvider<ImageComponentDescriptor>();
 }
 
-- (void)updateProps:(SharedProps)props oldProps:(SharedProps)oldProps
+- (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
 {
-  const auto &oldImageProps = *std::static_pointer_cast<const ImageProps>(oldProps ?: _props);
+  const auto &oldImageProps = *std::static_pointer_cast<const ImageProps>(_props);
   const auto &newImageProps = *std::static_pointer_cast<const ImageProps>(props);
-
-  [super updateProps:props oldProps:oldProps];
 
   // `resizeMode`
   if (oldImageProps.resizeMode != newImageProps.resizeMode) {
@@ -73,13 +70,21 @@
   if (oldImageProps.tintColor != newImageProps.tintColor) {
     _imageView.tintColor = [UIColor colorWithCGColor:newImageProps.tintColor.get()];
   }
+
+  [super updateProps:props oldProps:oldProps];
 }
 
 - (void)updateLocalData:(SharedLocalData)localData oldLocalData:(SharedLocalData)oldLocalData
 {
   SharedImageLocalData previousData = _imageLocalData;
   _imageLocalData = std::static_pointer_cast<const ImageLocalData>(localData);
-  assert(_imageLocalData);
+
+  if (!_imageLocalData) {
+    // This might happen in very rare cases (e.g. inside a subtree inside a node with `display: none`).
+    // That's quite normal.
+    return;
+  }
+
   bool havePreviousData = previousData != nullptr;
 
   if (!havePreviousData || _imageLocalData->getImageSource() != previousData->getImageSource()) {
@@ -120,6 +125,13 @@
 
 - (void)didReceiveImage:(UIImage *)image fromObserver:(void *)observer
 {
+  if (!_eventEmitter) {
+    // Notifications are delivered asynchronously and might arrive after the view is already recycled.
+    // In the future, we should incorporate an `EventEmitter` into a separate object owned by `ImageRequest` or `State`.
+    // See for more info: T46311063.
+    return;
+  }
+
   std::static_pointer_cast<const ImageEventEmitter>(_eventEmitter)->onLoad();
 
   const auto &imageProps = *std::static_pointer_cast<const ImageProps>(_props);
@@ -148,11 +160,19 @@
 
 - (void)didReceiveProgress:(float)progress fromObserver:(void *)observer
 {
+  if (!_eventEmitter) {
+    return;
+  }
+
   std::static_pointer_cast<const ImageEventEmitter>(_eventEmitter)->onProgress(progress);
 }
 
 - (void)didReceiveFailureFromObserver:(void *)observer
 {
+  if (!_eventEmitter) {
+    return;
+  }
+
   std::static_pointer_cast<const ImageEventEmitter>(_eventEmitter)->onError();
 }
 

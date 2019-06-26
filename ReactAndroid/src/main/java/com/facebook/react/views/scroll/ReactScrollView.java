@@ -12,8 +12,9 @@ import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
-import android.support.v4.view.ViewCompat;
+import androidx.core.view.ViewCompat;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -205,6 +206,35 @@ public class ReactScrollView extends ScrollView implements ReactClippingViewGrou
     }
   }
 
+  /**
+   * Since ReactScrollView handles layout changes on JS side, it does not call super.onlayout
+   * due to which mIsLayoutDirty flag in ScrollView remains true and prevents scrolling to child
+   * when requestChildFocus is called.
+   * Overriding this method and scrolling to child without checking any layout dirty flag. This will fix
+   * focus navigation issue for KeyEvents which are not handled by ScrollView, for example: KEYCODE_TAB.
+   */
+  @Override
+  public void requestChildFocus(View child, View focused) {
+    if (focused != null) {
+      scrollToChild(focused);
+    }
+    super.requestChildFocus(child, focused);
+  }
+
+  private void scrollToChild(View child) {
+    Rect tempRect = new Rect();
+    child.getDrawingRect(tempRect);
+
+    /* Offset from child's local coordinates to ScrollView coordinates */
+    offsetDescendantRectToMyCoords(child, tempRect);
+
+    int scrollDelta = computeScrollDeltaToGetChildRectOnScreen(tempRect);
+
+    if (scrollDelta != 0) {
+      scrollBy(0, scrollDelta);
+    }
+  }
+
   @Override
   protected void onScrollChanged(int x, int y, int oldX, int oldY) {
     super.onScrollChanged(x, y, oldX, oldY);
@@ -272,6 +302,16 @@ public class ReactScrollView extends ScrollView implements ReactClippingViewGrou
   }
 
   @Override
+  public boolean executeKeyEvent(KeyEvent event) {
+    int eventKeyCode = event.getKeyCode();
+    if (!mScrollEnabled && (eventKeyCode == KeyEvent.KEYCODE_DPAD_UP ||
+      eventKeyCode == KeyEvent.KEYCODE_DPAD_DOWN)) {
+      return false;
+    }
+    return super.executeKeyEvent(event);
+  }
+
+  @Override
   public void setRemoveClippedSubviews(boolean removeClippedSubviews) {
     if (removeClippedSubviews && mClippingRect == null) {
       mClippingRect = new Rect();
@@ -314,8 +354,11 @@ public class ReactScrollView extends ScrollView implements ReactClippingViewGrou
     //
     // Hence, we can use the absolute value from whatever the OS gives
     // us and use the sign of what mOnScrollDispatchHelper has tracked.
-    final int correctedVelocityY = (int)(Math.abs(velocityY) * Math.signum(mOnScrollDispatchHelper.getYFlingVelocity()));
-
+    float signum = Math.signum(mOnScrollDispatchHelper.getYFlingVelocity());
+    if (signum == 0) {
+      signum = Math.signum(velocityY);
+    }
+    final int correctedVelocityY = (int)(Math.abs(velocityY) * signum);
 
     if (mPagingEnabled) {
       flingAndSnap(correctedVelocityY);
@@ -665,7 +708,7 @@ public class ReactScrollView extends ScrollView implements ReactClippingViewGrou
 
   @Override
   protected void onOverScrolled(int scrollX, int scrollY, boolean clampedX, boolean clampedY) {
-    if (mScroller != null) {
+    if (mScroller != null && mContentView != null) {
       // FB SCROLLVIEW CHANGE
 
       // This is part two of the reimplementation of fling to fix the bounce-back bug. See #fling() for

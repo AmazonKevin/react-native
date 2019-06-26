@@ -12,6 +12,7 @@ import android.graphics.Rect;
 import android.os.Build;
 import android.view.View;
 import com.facebook.react.bridge.JSApplicationIllegalArgumentException;
+import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.common.MapBuilder;
@@ -21,10 +22,12 @@ import com.facebook.react.uimanager.PixelUtil;
 import com.facebook.react.uimanager.PointerEvents;
 import com.facebook.react.uimanager.Spacing;
 import com.facebook.react.uimanager.ThemedReactContext;
+import com.facebook.react.uimanager.UIManagerModule;
 import com.facebook.react.uimanager.ViewGroupManager;
 import com.facebook.react.uimanager.ViewProps;
 import com.facebook.react.uimanager.annotations.ReactProp;
 import com.facebook.react.uimanager.annotations.ReactPropGroup;
+import com.facebook.react.uimanager.events.EventDispatcher;
 import com.facebook.yoga.YogaConstants;
 import java.util.Locale;
 import java.util.Map;
@@ -223,6 +226,29 @@ public class ReactViewManager extends ViewGroupManager<ReactViewGroup> {
     // handled in NativeViewHierarchyOptimizer
   }
 
+  @ReactProp(name = "focusable")
+  public void setFocusable(final ReactViewGroup view, boolean focusable) {
+    if (focusable) {
+      view.setOnClickListener(
+              new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                  final EventDispatcher mEventDispatcher = ((ReactContext)view.getContext()).getNativeModule(UIManagerModule.class)
+                          .getEventDispatcher();
+                  mEventDispatcher.dispatchEvent(new ViewGroupClickEvent(view.getId()));
+                }});
+
+      // Clickable elements are focusable. On API 26, this is taken care by setClickable.
+      // Explicitly calling setFocusable here for backward compatibility.
+      view.setFocusable(true /*isFocusable*/);
+    }
+    else {
+      view.setOnClickListener(null);
+      view.setClickable(false);
+      // Don't set view.setFocusable(false) because we might still want it to be focusable for accessibiliy reasons
+    }
+  }
+
   @ReactProp(name = ViewProps.OVERFLOW)
   public void setOverflow(ReactViewGroup view, String overflow) {
     view.setOverflow(overflow);
@@ -263,25 +289,51 @@ public class ReactViewManager extends ViewGroupManager<ReactViewGroup> {
   public void receiveCommand(ReactViewGroup root, int commandId, @Nullable ReadableArray args) {
     switch (commandId) {
       case CMD_HOTSPOT_UPDATE: {
-        if (args == null || args.size() != 2) {
-          throw new JSApplicationIllegalArgumentException(
-              "Illegal number of arguments for 'updateHotspot' command");
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-          float x = PixelUtil.toPixelFromDIP(args.getDouble(0));
-          float y = PixelUtil.toPixelFromDIP(args.getDouble(1));
-          root.drawableHotspotChanged(x, y);
-        }
+        handleHotspotUpdate(root, args);
         break;
       }
       case CMD_SET_PRESSED: {
-        if (args == null || args.size() != 1) {
-          throw new JSApplicationIllegalArgumentException(
-              "Illegal number of arguments for 'setPressed' command");
-        }
-        root.setPressed(args.getBoolean(0));
+        handleSetPressed(root, args);
         break;
       }
+    }
+  }
+
+  @Override
+  public void receiveCommand(ReactViewGroup root, String commandId, @Nullable ReadableArray args) {
+    switch (commandId) {
+      case "hotspotUpdate": {
+        handleHotspotUpdate(root, args);
+        break;
+      }
+      case "setPressed": {
+        handleSetPressed(root, args);
+        break;
+      }
+    }
+  }
+
+  private void handleSetPressed(
+      ReactViewGroup root,
+      @Nullable ReadableArray args) {
+    if (args == null || args.size() != 1) {
+      throw new JSApplicationIllegalArgumentException(
+          "Illegal number of arguments for 'setPressed' command");
+    }
+    root.setPressed(args.getBoolean(0));
+  }
+
+  private void handleHotspotUpdate(
+      ReactViewGroup root,
+      @Nullable ReadableArray args) {
+    if (args == null || args.size() != 2) {
+      throw new JSApplicationIllegalArgumentException(
+          "Illegal number of arguments for 'updateHotspot' command");
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+      float x = PixelUtil.toPixelFromDIP(args.getDouble(0));
+      float y = PixelUtil.toPixelFromDIP(args.getDouble(1));
+      root.drawableHotspotChanged(x, y);
     }
   }
 

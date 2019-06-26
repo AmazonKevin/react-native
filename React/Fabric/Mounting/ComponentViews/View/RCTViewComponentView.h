@@ -12,9 +12,9 @@
 #import <React/UIView+ComponentViewProtocol.h>
 #import <react/components/view/ViewEventEmitter.h>
 #import <react/components/view/ViewProps.h>
+#import <react/core/EventEmitter.h>
 #import <react/core/LayoutMetrics.h>
 #import <react/core/Props.h>
-#import <react/events/EventEmitter.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -67,6 +67,23 @@ NS_ASSUME_NONNULL_BEGIN
  * Insets used when hit testing inside this view.
  */
 @property (nonatomic, assign) UIEdgeInsets hitTestEdgeInsets;
+
+/**
+ * Enforcing `call super` semantic for overridden methods from `RCTComponentViewProtocol`.
+ * The methods update the instance variables.
+ */
+- (void)updateProps:(facebook::react::Props::Shared const &)props
+           oldProps:(facebook::react::Props::Shared const &)oldProps NS_REQUIRES_SUPER;
+- (void)updateEventEmitter:(facebook::react::EventEmitter::Shared const &)eventEmitter NS_REQUIRES_SUPER;
+- (void)updateLayoutMetrics:(facebook::react::LayoutMetrics const &)layoutMetrics
+           oldLayoutMetrics:(facebook::react::LayoutMetrics const &)oldLayoutMetrics NS_REQUIRES_SUPER;
+- (void)finalizeUpdates:(RNComponentViewUpdateMask)updateMask NS_REQUIRES_SUPER;
+- (void)prepareForRecycle NS_REQUIRES_SUPER;
+
+/*
+ * This is a fragment of temporary workaround that we need only temporary and will get rid of soon.
+ */
+- (NSString *)componentViewName_DO_NOT_USE_THIS_IS_BROKEN;
 
 @end
 

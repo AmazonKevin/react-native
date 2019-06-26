@@ -8,7 +8,7 @@
 package com.facebook.react.views.scroll;
 
 import android.graphics.Color;
-import android.support.v4.view.ViewCompat;
+import androidx.core.view.ViewCompat;
 import android.util.DisplayMetrics;
 
 import com.facebook.react.bridge.ReadableArray;
@@ -33,7 +33,7 @@ import javax.annotation.Nullable;
 /**
  * View manager for {@link ReactScrollView} components.
  *
- * <p>Note that {@link ReactScrollView} and {@link ReactScrollView} are exposed to JS
+ * <p>Note that {@link ReactScrollView} and {@link ReactHorizontalScrollView} are exposed to JS
  * as a single ScrollView component, configured via the {@code horizontal} boolean property.
  */
 @ReactModule(name = ReactScrollViewManager.REACT_CLASS)
@@ -70,6 +70,10 @@ public class ReactScrollViewManager
   @ReactProp(name = "scrollEnabled", defaultBoolean = true)
   public void setScrollEnabled(ReactScrollView view, boolean value) {
     view.setScrollEnabled(value);
+
+    // Set focusable to match whether scroll is enabled. This improves keyboarding
+    // experience by not making scrollview a tab stop when you cannot interact with it.
+    view.setFocusable(value);
   }
 
   @ReactProp(name = "showsVerticalScrollIndicator")
@@ -177,6 +181,14 @@ public class ReactScrollViewManager
   public void receiveCommand(
       ReactScrollView scrollView,
       int commandId,
+      @Nullable ReadableArray args) {
+    ReactScrollViewCommandHelper.receiveCommand(this, scrollView, commandId, args);
+  }
+
+  @Override
+  public void receiveCommand(
+      ReactScrollView scrollView,
+      String commandId,
       @Nullable ReadableArray args) {
     ReactScrollViewCommandHelper.receiveCommand(this, scrollView, commandId, args);
   }

@@ -7,7 +7,7 @@
 
 package com.facebook.react.bridge;
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import com.facebook.jni.HybridData;
 import com.facebook.infer.annotation.Assertions;
@@ -59,6 +59,13 @@ public class WritableNativeMap extends ReadableNativeMap implements WritableMap 
   public void merge(@Nonnull ReadableMap source) {
     Assertions.assertCondition(source instanceof ReadableNativeMap, "Illegal type provided");
     mergeNativeMap((ReadableNativeMap) source);
+  }
+
+  @Override
+  public WritableMap copy() {
+    final WritableNativeMap target = new WritableNativeMap();
+    target.merge(this);
+    return target;
   }
 
   public WritableNativeMap() {

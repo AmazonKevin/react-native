@@ -32,7 +32,9 @@ public class DevInternalSettings implements
   private static final String PREFS_JS_BUNDLE_DELTAS_KEY = "js_bundle_deltas";
   private static final String PREFS_JS_BUNDLE_DELTAS_CPP_KEY = "js_bundle_deltas_cpp";
   private static final String PREFS_ANIMATIONS_DEBUG_KEY = "animations_debug";
-  private static final String PREFS_RELOAD_ON_JS_CHANGE_KEY = "reload_on_js_change";
+  // This option is no longer exposed in the dev menu UI.
+  // It was renamed in D15958697 so it doesn't get stuck with no way to turn it off:
+  private static final String PREFS_RELOAD_ON_JS_CHANGE_KEY = "reload_on_js_change_LEGACY";
   private static final String PREFS_INSPECTOR_DEBUG_KEY = "inspector_debug";
   private static final String PREFS_HOT_MODULE_REPLACEMENT_KEY = "hot_module_replacement";
   private static final String PREFS_REMOTE_JS_DEBUG_KEY = "remote_js_debug";
@@ -88,6 +90,10 @@ public class DevInternalSettings implements
     return mPreferences.getBoolean(PREFS_JS_DEV_MODE_DEBUG_KEY, true);
   }
 
+  public void setJSDevModeEnabled(boolean value) {
+    mPreferences.edit().putBoolean(PREFS_JS_DEV_MODE_DEBUG_KEY, value).apply();
+  }
+
   @Override
   public boolean isJSMinifyEnabled() {
     return mPreferences.getBoolean(PREFS_JS_MINIFY_DEBUG_KEY, false);
@@ -132,7 +138,7 @@ public class DevInternalSettings implements
 
   @SuppressLint("SharedPreferencesUse")
   public boolean isBundleDeltasEnabled() {
-    return mPreferences.getBoolean(PREFS_JS_BUNDLE_DELTAS_KEY, true);
+    return mPreferences.getBoolean(PREFS_JS_BUNDLE_DELTAS_KEY, false);
   }
 
   @SuppressLint("SharedPreferencesUse")

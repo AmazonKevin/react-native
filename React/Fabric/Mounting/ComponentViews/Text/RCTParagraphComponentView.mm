@@ -7,9 +7,11 @@
 
 #import "RCTParagraphComponentView.h"
 
+#import <react/components/text/ParagraphComponentDescriptor.h>
 #import <react/components/text/ParagraphLocalData.h>
 #import <react/components/text/ParagraphProps.h>
-#import <react/components/text/ParagraphShadowNode.h>
+#import <react/components/text/RawTextComponentDescriptor.h>
+#import <react/components/text/TextComponentDescriptor.h>
 #import <react/core/LocalData.h>
 #import <react/graphics/Geometry.h>
 #import <react/textlayoutmanager/RCTTextLayoutManager.h>
@@ -40,25 +42,30 @@ using namespace facebook::react;
 
 #pragma mark - RCTComponentViewProtocol
 
-+ (ComponentHandle)componentHandle
++ (ComponentDescriptorProvider)componentDescriptorProvider
 {
-  return ParagraphShadowNode::Handle();
+  return concreteComponentDescriptorProvider<ParagraphComponentDescriptor>();
 }
 
-- (void)updateProps:(SharedProps)props oldProps:(SharedProps)oldProps
++ (std::vector<facebook::react::ComponentDescriptorProvider>)supplementalComponentDescriptorProviders
+{
+  return {concreteComponentDescriptorProvider<RawTextComponentDescriptor>(),
+          concreteComponentDescriptorProvider<TextComponentDescriptor>()};
+}
+
+- (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
 {
   const auto &paragraphProps = std::static_pointer_cast<const ParagraphProps>(props);
 
-  [super updateProps:props oldProps:oldProps];
-
   assert(paragraphProps);
   _paragraphAttributes = paragraphProps->paragraphAttributes;
+
+  [super updateProps:props oldProps:oldProps];
 }
 
 - (void)updateLocalData:(SharedLocalData)localData oldLocalData:(SharedLocalData)oldLocalData
 {
   _paragraphLocalData = std::static_pointer_cast<const ParagraphLocalData>(localData);
-  assert(_paragraphLocalData);
   [self setNeedsDisplay];
 }
 

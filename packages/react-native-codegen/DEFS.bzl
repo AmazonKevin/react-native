@@ -1,9 +1,13 @@
+load("@fbsource//tools/build_defs:default_platform_defs.bzl", "IOS", "MACOSX")
 load("@fbsource//tools/build_defs:fb_native_wrapper.bzl", "fb_native")
 load("@fbsource//tools/build_defs/apple:flag_defs.bzl", "get_debug_preprocessor_flags")
 load(
     "//tools/build_defs/oss:rn_defs.bzl",
     "ANDROID",
     "APPLE",
+    "CXX",
+    "YOGA_CXX_TARGET",
+    "fb_xplat_cxx_test",
     "get_apple_compiler_flags",
     "get_apple_inspector_flags",
     "react_native_xplat_target",
@@ -31,6 +35,7 @@ def rn_codegen(
     generate_event_emitter_cpp_name = "generate_event_emitter_cpp-{}".format(name)
     generate_event_emitter_h_name = "generate_event_emitter_h-{}".format(name)
     generate_props_cpp_name = "generate_props_cpp-{}".format(name)
+    generate_tests_cpp_name = "generate_tests_cpp-{}".format(name)
     generate_props_h_name = "generated_props_h-{}".format(name)
     generate_shadow_node_cpp_name = "generated_shadow_node_cpp-{}".format(name)
     generate_shadow_node_h_name = "generated_shadow_node_h-{}".format(name)
@@ -67,6 +72,12 @@ def rn_codegen(
     )
 
     fb_native.genrule(
+        name = generate_tests_cpp_name,
+        cmd = "cp $(location :{})/Tests.cpp $OUT".format(generate_fixtures_rule_name),
+        out = "Tests.cpp",
+    )
+
+    fb_native.genrule(
         name = generate_props_h_name,
         cmd = "cp $(location :{})/Props.h $OUT".format(generate_fixtures_rule_name),
         out = "Props.h",
@@ -87,6 +98,7 @@ def rn_codegen(
     # libs
     rn_xplat_cxx_library(
         name = "generated_components-{}".format(name),
+        tests = [":generated_tests-{}".format(name)],
         srcs = [
             ":{}".format(generate_event_emitter_cpp_name),
             ":{}".format(generate_props_cpp_name),
@@ -113,7 +125,7 @@ def rn_codegen(
         ],
         fbobjc_compiler_flags = get_apple_compiler_flags(),
         fbobjc_preprocessor_flags = get_debug_preprocessor_flags() + get_apple_inspector_flags(),
-        platforms = (ANDROID, APPLE),
+        platforms = (ANDROID, APPLE, CXX),
         preprocessor_flags = [
             "-DLOG_TAG=\"ReactNative\"",
             "-DWITH_FBSYSTRACE=1",
@@ -125,10 +137,33 @@ def rn_codegen(
             "fbsource//xplat/folly:memory",
             "fbsource//xplat/folly:molly",
             "fbsource//xplat/third-party/glog:glog",
-            "fbsource//xplat/yoga:yoga",
+            YOGA_CXX_TARGET,
             react_native_xplat_target("fabric/debug:debug"),
             react_native_xplat_target("fabric/core:core"),
             react_native_xplat_target("fabric/graphics:graphics"),
+            react_native_xplat_target("fabric/components/image:image"),
+            react_native_xplat_target("fabric/imagemanager:imagemanager"),
             react_native_xplat_target("fabric/components/view:view"),
+        ],
+    )
+
+    # Tests
+    fb_xplat_cxx_test(
+        name = "generated_tests-{}".format(name),
+        srcs = [
+            ":{}".format(generate_tests_cpp_name),
+        ],
+        compiler_flags = [
+            "-fexceptions",
+            "-frtti",
+            "-std=c++14",
+            "-Wall",
+        ],
+        contacts = ["oncall+react_native@xmail.facebook.com"],
+        apple_sdks = (IOS, MACOSX),
+        platforms = (ANDROID, APPLE, CXX),
+        deps = [
+            "fbsource//xplat/third-party/gmock:gtest",
+            ":generated_components-{}".format(name),
         ],
     )

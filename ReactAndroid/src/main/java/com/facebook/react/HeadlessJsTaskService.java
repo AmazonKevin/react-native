@@ -75,7 +75,7 @@ public abstract class HeadlessJsTaskService extends Service implements HeadlessJ
         Assertions.assertNotNull((PowerManager) context.getSystemService(POWER_SERVICE));
       sWakeLock = powerManager.newWakeLock(
         PowerManager.PARTIAL_WAKE_LOCK,
-        HeadlessJsTaskService.class.getSimpleName());
+        HeadlessJsTaskService.class.getCanonicalName());
       sWakeLock.setReferenceCounted(false);
       sWakeLock.acquire();
     }
@@ -108,9 +108,7 @@ public abstract class HeadlessJsTaskService extends Service implements HeadlessJ
             reactInstanceManager.removeReactInstanceEventListener(this);
           }
         });
-      if (!reactInstanceManager.hasStartedCreatingInitialContext()) {
-        reactInstanceManager.createReactContextInBackground();
-      }
+      reactInstanceManager.createReactContextInBackground();
     } else {
       invokeStartTask(reactContext, taskConfig);
     }

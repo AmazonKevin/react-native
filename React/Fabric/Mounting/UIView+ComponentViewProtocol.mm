@@ -17,6 +17,17 @@ using namespace facebook::react;
 
 @implementation UIView (ComponentViewProtocol)
 
++ (ComponentDescriptorProvider)componentDescriptorProvider
+{
+  RCTAssert(NO, @"`-[RCTComponentViewProtocol componentDescriptorProvider]` must be implemented in a concrete class.");
+  return {};
+}
+
++ (std::vector<facebook::react::ComponentDescriptorProvider>)supplementalComponentDescriptorProviders
+{
+  return {};
+}
+
 - (void)mountChildComponentView:(UIView<RCTComponentViewProtocol> *)childComponentView index:(NSInteger)index
 {
   [self insertSubview:childComponentView atIndex:index];
@@ -28,12 +39,12 @@ using namespace facebook::react;
   [childComponentView removeFromSuperview];
 }
 
-- (void)updateProps:(SharedProps)props oldProps:(SharedProps)oldProps
+- (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
 {
   // Default implementation does nothing.
 }
 
-- (void)updateEventEmitter:(SharedEventEmitter)eventEmitter
+- (void)updateEventEmitter:(EventEmitter::Shared const &)eventEmitter
 {
   // Default implementation does nothing.
 }
@@ -43,7 +54,14 @@ using namespace facebook::react;
   // Default implementation does nothing.
 }
 
-- (void)updateLayoutMetrics:(LayoutMetrics)layoutMetrics oldLayoutMetrics:(LayoutMetrics)oldLayoutMetrics
+- (void)updateState:(facebook::react::State::Shared const &)state
+           oldState:(facebook::react::State::Shared const &)oldState
+{
+  // Default implementation does nothing.
+}
+
+- (void)updateLayoutMetrics:(LayoutMetrics const &)layoutMetrics
+           oldLayoutMetrics:(LayoutMetrics const &)oldLayoutMetrics
 {
   if (layoutMetrics.frame != oldLayoutMetrics.frame) {
     CGRect frame = RCTCGRectFromRect(layoutMetrics.frame);
@@ -77,9 +95,20 @@ using namespace facebook::react;
   }
 }
 
+- (void)finalizeUpdates:(RNComponentViewUpdateMask)updateMask
+{
+  // Default implementation does nothing.
+}
+
 - (void)prepareForRecycle
 {
   // Default implementation does nothing.
+}
+
+- (facebook::react::SharedProps)props
+{
+  RCTAssert(NO, @"props access should be implemented by RCTViewComponentView.");
+  return nullptr;
 }
 
 @end

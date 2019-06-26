@@ -10,6 +10,26 @@
 
 'use strict';
 
+export type FunctionTypeAnnotation = $ReadOnly<{|
+  type: 'FunctionTypeAnnotation',
+  params: $ReadOnlyArray<FunctionTypeParamAnnotation>,
+|}>;
+
+export type FunctionTypeParamAnnotation = $ReadOnly<{|
+  name: string,
+  typeAnnotation: TypeAnnotation,
+|}>;
+
+export type TypeAnnotation = BooleanTypeAnnotation | Int32TypeAnnotation;
+
+export type BooleanTypeAnnotation = $ReadOnly<{|
+  type: 'BooleanTypeAnnotation',
+|}>;
+
+export type Int32TypeAnnotation = $ReadOnly<{|
+  type: 'Int32TypeAnnotation',
+|}>;
+
 export type ObjectPropertyType =
   | $ReadOnly<{|
       type: 'BooleanTypeAnnotation',
@@ -32,6 +52,14 @@ export type ObjectPropertyType =
       optional: boolean,
     |}>
   | $ReadOnly<{|
+      type: 'StringEnumTypeAnnotation',
+      name: string,
+      optional: boolean,
+      options: $ReadOnlyArray<{|
+        name: string,
+      |}>,
+    |}>
+  | $ReadOnly<{|
       type: 'ObjectTypeAnnotation',
       name: string,
       optional: boolean,
@@ -45,7 +73,7 @@ type PropTypeTypeAnnotation =
     |}>
   | $ReadOnly<{|
       type: 'StringTypeAnnotation',
-      default: string,
+      default: string | null,
     |}>
   | $ReadOnly<{|
       type: 'FloatTypeAnnotation',
@@ -64,7 +92,34 @@ type PropTypeTypeAnnotation =
     |}>
   | $ReadOnly<{|
       type: 'NativePrimitiveTypeAnnotation',
-      name: 'ColorPrimitive',
+      name: 'ColorPrimitive' | 'ImageSourcePrimitive' | 'PointPrimitive',
+    |}>
+  | $ReadOnly<{|
+      type: 'ArrayTypeAnnotation',
+      elementType:
+        | $ReadOnly<{|
+            type: 'BooleanTypeAnnotation',
+          |}>
+        | $ReadOnly<{|
+            type: 'StringTypeAnnotation',
+          |}>
+        | $ReadOnly<{|
+            type: 'FloatTypeAnnotation',
+          |}>
+        | $ReadOnly<{|
+            type: 'Int32TypeAnnotation',
+          |}>
+        | $ReadOnly<{|
+            type: 'StringEnumTypeAnnotation',
+            default: string,
+            options: $ReadOnlyArray<{|
+              name: string,
+            |}>,
+          |}>
+        | $ReadOnly<{|
+            type: 'NativePrimitiveTypeAnnotation',
+            name: 'ColorPrimitive' | 'ImageSourcePrimitive' | 'PointPrimitive',
+          |}>,
     |}>;
 
 export type PropTypeShape = $ReadOnly<{|
@@ -79,20 +134,42 @@ export type EventTypeShape = $ReadOnly<{|
   optional: boolean,
   typeAnnotation: $ReadOnly<{|
     type: 'EventTypeAnnotation',
-    argument: $ReadOnly<{|
+    argument?: $ReadOnly<{|
       type: 'ObjectTypeAnnotation',
       properties: $ReadOnlyArray<ObjectPropertyType>,
     |}>,
   |}>,
 |}>;
 
+export type CommandTypeShape = $ReadOnly<{|
+  name: string,
+  optional: boolean,
+  typeAnnotation: FunctionTypeAnnotation,
+|}>;
+
+export type OptionsShape = $ReadOnly<{|
+  interfaceOnly?: boolean,
+
+  // Use for components with no current paper rename in progress
+  // Does not check for new name
+  paperComponentName?: string,
+
+  // Use for components currently being renamed in paper
+  // Will use new name if it is available and fallback to this name
+  paperComponentNameDeprecated?: string,
+|}>;
+
+export type ExtendsPropsShape = $ReadOnly<{|
+  type: 'ReactNativeBuiltInType',
+  knownTypeName: 'ReactNativeCoreViewProps',
+|}>;
+
 export type ComponentShape = $ReadOnly<{|
-  extendsProps: $ReadOnlyArray<{|
-    type: 'ReactNativeBuiltInType',
-    knownTypeName: 'ReactNativeCoreViewProps',
-  |}>,
+  ...OptionsShape,
+  extendsProps: $ReadOnlyArray<ExtendsPropsShape>,
   events: $ReadOnlyArray<EventTypeShape>,
   props: $ReadOnlyArray<PropTypeShape>,
+  commands: $ReadOnlyArray<CommandTypeShape>,
 |}>;
 
 export type SchemaType = $ReadOnly<{|

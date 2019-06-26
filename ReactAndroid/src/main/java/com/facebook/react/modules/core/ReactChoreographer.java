@@ -14,6 +14,7 @@ import javax.annotation.Nullable;
 import com.facebook.common.logging.FLog;
 import com.facebook.infer.annotation.Assertions;
 import com.facebook.react.common.ReactConstants;
+import javax.annotation.concurrent.GuardedBy;
 
 /**
  * A simple wrapper around Choreographer that allows us to control the order certain callbacks
@@ -78,6 +79,8 @@ public class ReactChoreographer {
   // This needs to be volatile due to double checked locking issue - https://fburl.com/z409owpf
   private @Nullable volatile ChoreographerCompat mChoreographer;
   private final ReactChoreographerDispatcher mReactChoreographerDispatcher;
+  private final Object mCallbackQueuesLock = new Object();
+  @GuardedBy("mCallbackQueuesLock")
   private final ArrayDeque<ChoreographerCompat.FrameCallback>[] mCallbackQueues;
 
   private int mTotalCallbacks = 0;
@@ -92,27 +95,34 @@ public class ReactChoreographer {
     initializeChoreographer(null);
   }
 
-  public synchronized void postFrameCallback(
+  public void postFrameCallback(
     CallbackType type,
     ChoreographerCompat.FrameCallback frameCallback) {
-    mCallbackQueues[type.getOrder()].addLast(frameCallback);
-    mTotalCallbacks++;
-    Assertions.assertCondition(mTotalCallbacks > 0);
-    if (!mHasPostedCallback) {
-      if (mChoreographer == null) {
-        initializeChoreographer(new Runnable(){
-          @Override
-          public void run() {
-            postFrameCallbackOnChoreographer();
-          }
-        });
-      } else {
-        postFrameCallbackOnChoreographer();
+    synchronized (mCallbackQueuesLock) {
+      mCallbackQueues[type.getOrder()].addLast(frameCallback);
+      mTotalCallbacks++;
+      Assertions.assertCondition(mTotalCallbacks > 0);
+      if (!mHasPostedCallback) {
+        if (mChoreographer == null) {
+          initializeChoreographer(
+              new Runnable() {
+                @Override
+                public void run() {
+                  postFrameCallbackOnChoreographer();
+                }
+              });
+        } else {
+          postFrameCallbackOnChoreographer();
+        }
       }
     }
   }
 
-  public void postFrameCallbackOnChoreographer() {
+  /**
+   * This method writes on mHasPostedCallback and it should be called from another method that
+   * has the lock mCallbackQueuesLock
+   */
+  private void postFrameCallbackOnChoreographer() {
     mChoreographer.postFrameCallback(mReactChoreographerDispatcher);
     mHasPostedCallback = true;
   }
@@ -133,17 +143,23 @@ public class ReactChoreographer {
     });
   }
 
-  public synchronized void removeFrameCallback(
+  public void removeFrameCallback(
     CallbackType type,
     ChoreographerCompat.FrameCallback frameCallback) {
-    if (mCallbackQueues[type.getOrder()].removeFirstOccurrence(frameCallback)) {
-      mTotalCallbacks--;
-      maybeRemoveFrameCallback();
-    } else {
-      FLog.e(ReactConstants.TAG, "Tried to remove non-existent frame callback");
+    synchronized (mCallbackQueuesLock) {
+      if (mCallbackQueues[type.getOrder()].removeFirstOccurrence(frameCallback)) {
+        mTotalCallbacks--;
+        maybeRemoveFrameCallback();
+      } else {
+        FLog.e(ReactConstants.TAG, "Tried to remove non-existent frame callback");
+      }
     }
   }
 
+  /**
+   * This method reads and writes on mHasPostedCallback and it should be called from another method
+   * that already has the lock mCallbackQueuesLock.
+   */
   private void maybeRemoveFrameCallback() {
     Assertions.assertCondition(mTotalCallbacks >= 0);
     if (mTotalCallbacks == 0 && mHasPostedCallback) {
@@ -158,13 +174,19 @@ public class ReactChoreographer {
 
     @Override
     public void doFrame(long frameTimeNanos) {
-      synchronized (ReactChoreographer.this) {
+      synchronized (mCallbackQueuesLock) {
         mHasPostedCallback = false;
         for (int i = 0; i < mCallbackQueues.length; i++) {
-          int initialLength = mCallbackQueues[i].size();
+          ArrayDeque<ChoreographerCompat.FrameCallback> callbackQueue = mCallbackQueues[i];
+          int initialLength = callbackQueue.size();
           for (int callback = 0; callback < initialLength; callback++) {
-            mCallbackQueues[i].removeFirst().doFrame(frameTimeNanos);
-            mTotalCallbacks--;
+            ChoreographerCompat.FrameCallback frameCallback = callbackQueue.pollFirst();
+            if (frameCallback != null) {
+              frameCallback.doFrame(frameTimeNanos);
+              mTotalCallbacks--;
+            } else {
+              FLog.e(ReactConstants.TAG, "Tried to execute non-existent frame callback");
+            }
           }
         }
         maybeRemoveFrameCallback();

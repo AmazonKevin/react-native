@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the LICENSE
@@ -56,9 +56,7 @@ public:
     logger_.withContext = logger;
     loggerUsesContext_ = true;
   }
-  void setLogger(std::nullptr_t) {
-    setLogger(YGLogger{nullptr});
-  }
+  void setLogger(std::nullptr_t) { setLogger(YGLogger{nullptr}); }
 
   YGNodeRef cloneNode(
       YGNodeRef node,

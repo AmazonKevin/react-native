@@ -2,6 +2,7 @@ load("@fbsource//tools/build_defs:default_platform_defs.bzl", "ANDROID", "APPLE"
 load("@fbsource//tools/build_defs:fb_native_wrapper.bzl", "fb_native")
 load("@fbsource//tools/build_defs:fb_xplat_cxx_binary.bzl", "fb_xplat_cxx_binary")
 load("@fbsource//tools/build_defs/oss:rn_defs.bzl", "rn_xplat_cxx_library")
+load("@fbsource//tools/build_defs/third_party:yarn_defs.bzl", "yarn_workspace")
 load("@fbsource//xplat/js/react-native-github/packages/react-native-codegen:DEFS.bzl", "rn_codegen_test")
 
 fb_native.sh_binary(
@@ -17,18 +18,18 @@ fb_native.sh_binary(
 
 fb_native.sh_binary(
     name = "write_to_json",
-    main = "buck_tests/combine_js_to_schema.sh",
+    main = "src/cli/combine/combine_js_to_schema.sh",
     resources = [
-        "buck_tests/combine-js-to-schema.js",
-        "buck_tests/combine_js_to_schema.sh",
         "fbsource//xplat/js:setup_env",
+        "src/cli/combine/combine-js-to-schema.js",
+        "src/cli/combine/combine_js_to_schema.sh",
     ],
     visibility = ["PUBLIC"],
 )
 
 fb_native.sh_binary(
     name = "rn_codegen",
-    main = "buck_tests/generate_tests.sh",
+    main = "buck_tests/generate-tests.sh",
     resources = glob(
         [
             "buck_tests/**/*.js",
@@ -44,35 +45,55 @@ fb_native.sh_binary(
 )
 
 rn_codegen_test(
-    fixture_name = "SINGLE_COMPONENT_WITH_BOOLEAN_PROP",
+    fixture_name = "INTERFACE_ONLY",
 )
 
 rn_codegen_test(
-    fixture_name = "SINGLE_COMPONENT_WITH_STRING_PROP",
+    fixture_name = "BOOLEAN_PROP",
 )
 
 rn_codegen_test(
-    fixture_name = "SINGLE_COMPONENT_WITH_INTEGER_PROPS",
+    fixture_name = "STRING_PROP",
 )
 
 rn_codegen_test(
-    fixture_name = "SINGLE_COMPONENT_WITH_FLOAT_PROPS",
+    fixture_name = "INTEGER_PROPS",
 )
 
 rn_codegen_test(
-    fixture_name = "SINGLE_COMPONENT_WITH_COLOR_PROP",
+    fixture_name = "FLOAT_PROPS",
 )
 
 rn_codegen_test(
-    fixture_name = "SINGLE_COMPONENT_WITH_ENUM_PROP",
+    fixture_name = "COLOR_PROP",
 )
 
 rn_codegen_test(
-    fixture_name = "SINGLE_COMPONENT_WITH_EVENT_PROPS",
+    fixture_name = "IMAGE_PROP",
 )
 
 rn_codegen_test(
-    fixture_name = "SINGLE_COMPONENT_WITH_EVENT_NESTED_OBJECT_PROPS",
+    fixture_name = "POINT_PROP",
+)
+
+rn_codegen_test(
+    fixture_name = "ARRAY_PROPS",
+)
+
+rn_codegen_test(
+    fixture_name = "MULTI_NATIVE_PROP",
+)
+
+rn_codegen_test(
+    fixture_name = "ENUM_PROP",
+)
+
+rn_codegen_test(
+    fixture_name = "EVENT_PROPS",
+)
+
+rn_codegen_test(
+    fixture_name = "EVENT_NESTED_OBJECT_PROPS",
 )
 
 rn_codegen_test(
@@ -99,14 +120,19 @@ fb_xplat_cxx_binary(
     ],
     visibility = ["PUBLIC"],
     deps = [
-        ":generated_components-SINGLE_COMPONENT_WITH_BOOLEAN_PROP",
-        ":generated_components-SINGLE_COMPONENT_WITH_COLOR_PROP",
-        ":generated_components-SINGLE_COMPONENT_WITH_ENUM_PROP",
-        ":generated_components-SINGLE_COMPONENT_WITH_EVENT_NESTED_OBJECT_PROPS",
-        ":generated_components-SINGLE_COMPONENT_WITH_EVENT_PROPS",
-        ":generated_components-SINGLE_COMPONENT_WITH_FLOAT_PROPS",
-        ":generated_components-SINGLE_COMPONENT_WITH_INTEGER_PROPS",
-        ":generated_components-SINGLE_COMPONENT_WITH_STRING_PROP",
+        ":generated_components-ARRAY_PROPS",
+        ":generated_components-BOOLEAN_PROP",
+        ":generated_components-COLOR_PROP",
+        ":generated_components-ENUM_PROP",
+        ":generated_components-EVENT_NESTED_OBJECT_PROPS",
+        ":generated_components-EVENT_PROPS",
+        ":generated_components-FLOAT_PROPS",
+        ":generated_components-IMAGE_PROP",
+        ":generated_components-INTEGER_PROPS",
+        ":generated_components-INTERFACE_ONLY",
+        ":generated_components-MULTI_NATIVE_PROP",
+        ":generated_components-POINT_PROP",
+        ":generated_components-STRING_PROP",
         ":generated_components-TWO_COMPONENTS_DIFFERENT_FILES",
         ":generated_components-TWO_COMPONENTS_SAME_FILE",
     ],
@@ -131,15 +157,42 @@ rn_xplat_cxx_library(
         "PUBLIC",
     ],
     deps = [
-        ":generated_components-SINGLE_COMPONENT_WITH_BOOLEAN_PROP",
-        ":generated_components-SINGLE_COMPONENT_WITH_COLOR_PROP",
-        ":generated_components-SINGLE_COMPONENT_WITH_ENUM_PROP",
-        ":generated_components-SINGLE_COMPONENT_WITH_EVENT_NESTED_OBJECT_PROPS",
-        ":generated_components-SINGLE_COMPONENT_WITH_EVENT_PROPS",
-        ":generated_components-SINGLE_COMPONENT_WITH_FLOAT_PROPS",
-        ":generated_components-SINGLE_COMPONENT_WITH_INTEGER_PROPS",
-        ":generated_components-SINGLE_COMPONENT_WITH_STRING_PROP",
+        ":generated_components-ARRAY_PROPS",
+        ":generated_components-BOOLEAN_PROP",
+        ":generated_components-COLOR_PROP",
+        ":generated_components-ENUM_PROP",
+        ":generated_components-EVENT_NESTED_OBJECT_PROPS",
+        ":generated_components-EVENT_PROPS",
+        ":generated_components-FLOAT_PROPS",
+        ":generated_components-IMAGE_PROP",
+        ":generated_components-INTEGER_PROPS",
+        ":generated_components-INTERFACE_ONLY",
+        ":generated_components-MULTI_NATIVE_PROP",
+        ":generated_components-POINT_PROP",
+        ":generated_components-STRING_PROP",
         ":generated_components-TWO_COMPONENTS_DIFFERENT_FILES",
         ":generated_components-TWO_COMPONENTS_SAME_FILE",
     ],
+)
+
+yarn_workspace(
+    name = "yarn-workspace",
+    srcs = glob(
+        ["**/*.js"],
+        exclude = [
+            "**/__fixtures__/**",
+            "**/__flowtests__/**",
+            "**/__mocks__/**",
+            "**/__server_snapshot_tests__/**",
+            "**/__tests__/**",
+            "**/node_modules/**",
+            "**/node_modules/.bin/**",
+            "**/.*",
+            "**/.*/**",
+            "**/.*/.*",
+            "**/*.xcodeproj/**",
+            "**/*.xcworkspace/**",
+        ],
+    ),
+    visibility = ["PUBLIC"],
 )

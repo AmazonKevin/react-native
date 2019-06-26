@@ -7,14 +7,17 @@
 
 package com.facebook.react.views.textinput;
 
+import static android.view.View.FOCUS_FORWARD;
+
 import android.graphics.PorterDuff;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
-import android.support.v4.content.ContextCompat;
+import androidx.core.content.ContextCompat;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
+import android.text.Layout;
 import android.text.Spannable;
 import android.text.TextWatcher;
 import android.util.TypedValue;
@@ -23,11 +26,14 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.TextView;
+import com.facebook.common.logging.FLog;
 import com.facebook.infer.annotation.Assertions;
+import com.facebook.react.bridge.Dynamic;
 import com.facebook.react.bridge.JSApplicationIllegalArgumentException;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.ReadableType;
 import com.facebook.react.bridge.UIManager;
 import com.facebook.react.common.MapBuilder;
 import com.facebook.react.module.annotations.ReactModule;
@@ -60,7 +66,7 @@ import javax.annotation.Nullable;
  */
 @ReactModule(name = ReactTextInputManager.REACT_CLASS)
 public class ReactTextInputManager extends BaseViewManager<ReactEditText, LayoutShadowNode> {
-
+  public static final String TAG = ReactTextInputManager.class.getSimpleName();
   protected static final String REACT_CLASS = "AndroidTextInput";
 
   private static final int[] SPACING_TYPES = {
@@ -70,7 +76,7 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
   private static final int FOCUS_TEXT_INPUT = 1;
   private static final int BLUR_TEXT_INPUT = 2;
 
-  private static final int INPUT_TYPE_KEYBOARD_NUMBER_PAD = InputType.TYPE_CLASS_NUMBER; 
+  private static final int INPUT_TYPE_KEYBOARD_NUMBER_PAD = InputType.TYPE_CLASS_NUMBER;
   private static final int INPUT_TYPE_KEYBOARD_DECIMAL_PAD = INPUT_TYPE_KEYBOARD_NUMBER_PAD |
           InputType.TYPE_NUMBER_FLAG_DECIMAL;
   private static final int INPUT_TYPE_KEYBOARD_NUMBERED = INPUT_TYPE_KEYBOARD_DECIMAL_PAD |
@@ -182,6 +188,23 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
   }
 
   @Override
+  public void receiveCommand(
+      ReactEditText reactEditText,
+      String commandId,
+      @Nullable ReadableArray args) {
+    switch (commandId) {
+      case "focus":
+      case "focusTextInput":
+        reactEditText.requestFocusFromJS();
+        break;
+      case "blur":
+      case "blurTextInput":
+        reactEditText.clearFocusFromJS();
+        break;
+    }
+  }
+
+  @Override
   public void updateExtraData(ReactEditText view, Object extraData) {
     if (extraData instanceof ReactTextUpdate) {
       ReactTextUpdate update = (ReactTextUpdate) extraData;
@@ -197,6 +220,8 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
         TextInlineImageSpan.possiblyUpdateInlineImageSpans(spannable, view);
       }
       view.maybeSetText(update);
+      if (update.getSelectionStart() != UNSET && update.getSelectionEnd() != UNSET)
+        view.setSelection(update.getSelectionStart(), update.getSelectionEnd());
     }
   }
 
@@ -269,22 +294,8 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
     }
   }
 
-  @ReactProp(name = "selection")
-  public void setSelection(ReactEditText view, @Nullable ReadableMap selection) {
-    if (selection == null) {
-      return;
-    }
-
-    if (selection.hasKey("start") && selection.hasKey("end")) {
-      view.setSelection(selection.getInt("start"), selection.getInt("end"));
-    }
-  }
-
   @ReactProp(name = "importantForAutofill")
   public void setImportantForAutofill(ReactEditText view, @Nullable String value) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-      return;
-    }
     int mode = View.IMPORTANT_FOR_AUTOFILL_AUTO;
     if ("no".equals(value)) {
       mode = View.IMPORTANT_FOR_AUTOFILL_NO;
@@ -295,7 +306,23 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
     } else if ("yesExcludeDescendants".equals(value)) {
       mode = View.IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS;
     }
+    setImportantForAutofill(view, mode);
+  }
+
+  private void setImportantForAutofill(ReactEditText view, int mode) {
+    // Autofill hints were added in Android API 26.
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+      return;
+    }
     view.setImportantForAutofill(mode);
+  }
+
+  private void setAutofillHints(ReactEditText view, String... hints) {
+    // Autofill hints were added in Android API 26.
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+      return;
+    }
+    view.setAutofillHints(hints);
   }
 
   @ReactProp(name = "onSelectionChange", defaultBoolean = false)
@@ -408,6 +435,11 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
     } catch (IllegalAccessException ex) {}
   }
 
+  @ReactProp(name= "mostRecentEventCount", defaultInt = 0)
+  public void setMostRecentEventCount(ReactEditText view, int mostRecentEventCount) {
+    view.setMostRecentEventCount(mostRecentEventCount);
+  }
+
   @ReactProp(name = "caretHidden", defaultBoolean = false)
   public void setCaretHidden(ReactEditText view, boolean caretHidden) {
     view.setCursorVisible(!caretHidden);
@@ -442,9 +474,14 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
     // Drawable.mutate() can sometimes crash due to an AOSP bug:
     // See https://code.google.com/p/android/issues/detail?id=191754 for more info
     Drawable background = view.getBackground();
-    Drawable drawableToMutate = background.getConstantState() != null ?
-      background.mutate() :
-      background;
+    Drawable drawableToMutate = background;
+    if (background.getConstantState() != null) {
+      try {
+        drawableToMutate = background.mutate();
+      } catch (NullPointerException e) {
+        FLog.e(TAG, "NullPointerException when setting underlineColorAndroid for TextInput", e);
+      }
+    }
 
     if (underlineColor == null) {
       drawableToMutate.clearColorFilter();
@@ -455,19 +492,28 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
 
   @ReactProp(name = ViewProps.TEXT_ALIGN)
   public void setTextAlign(ReactEditText view, @Nullable String textAlign) {
-    if (textAlign == null || "auto".equals(textAlign)) {
-      view.setGravityHorizontal(Gravity.NO_GRAVITY);
-    } else if ("left".equals(textAlign)) {
-      view.setGravityHorizontal(Gravity.LEFT);
-    } else if ("right".equals(textAlign)) {
-      view.setGravityHorizontal(Gravity.RIGHT);
-    } else if ("center".equals(textAlign)) {
-      view.setGravityHorizontal(Gravity.CENTER_HORIZONTAL);
-    } else if ("justify".equals(textAlign)) {
-      // Fallback gracefully for cross-platform compat instead of error
+    if ("justify".equals(textAlign)) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        view.setJustificationMode(Layout.JUSTIFICATION_MODE_INTER_WORD);
+      }
       view.setGravityHorizontal(Gravity.LEFT);
     } else {
-      throw new JSApplicationIllegalArgumentException("Invalid textAlign: " + textAlign);
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        view.setJustificationMode(Layout.JUSTIFICATION_MODE_NONE);
+      }
+
+      if (textAlign == null || "auto".equals(textAlign)) {
+        view.setGravityHorizontal(Gravity.NO_GRAVITY);
+      } else if ("left".equals(textAlign)) {
+        view.setGravityHorizontal(Gravity.LEFT);
+      } else if ("right".equals(textAlign)) {
+        view.setGravityHorizontal(Gravity.RIGHT);
+      } else if ("center".equals(textAlign)) {
+        view.setGravityHorizontal(Gravity.CENTER_HORIZONTAL);
+      } else {
+        throw new JSApplicationIllegalArgumentException("Invalid textAlign: " + textAlign);
+      }
+
     }
   }
 
@@ -551,33 +597,33 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
   @ReactProp(name = "autoComplete")
   public void setTextContentType(ReactEditText view, @Nullable String autocomplete) {
     if (autocomplete == null) {
-      view.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+      setImportantForAutofill(view, View.IMPORTANT_FOR_AUTOFILL_NO);
     } else if ("username".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_USERNAME);
+      setAutofillHints(view, View.AUTOFILL_HINT_USERNAME);
     } else if ("password".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_PASSWORD);
+      setAutofillHints(view, View.AUTOFILL_HINT_PASSWORD);
     } else if ("email".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_EMAIL_ADDRESS);
+      setAutofillHints(view, View.AUTOFILL_HINT_EMAIL_ADDRESS);
     } else if ("name".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_NAME);
+      setAutofillHints(view, View.AUTOFILL_HINT_NAME);
     } else if ("tel".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_PHONE);
+      setAutofillHints(view, View.AUTOFILL_HINT_PHONE);
     } else if ("street-address".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_POSTAL_ADDRESS);
+      setAutofillHints(view, View.AUTOFILL_HINT_POSTAL_ADDRESS);
     } else if ("postal-code".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_POSTAL_CODE);
+      setAutofillHints(view, View.AUTOFILL_HINT_POSTAL_CODE);
     } else if ("cc-number".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_CREDIT_CARD_NUMBER);
+      setAutofillHints(view, View.AUTOFILL_HINT_CREDIT_CARD_NUMBER);
     } else if ("cc-csc".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_CREDIT_CARD_SECURITY_CODE);
+      setAutofillHints(view, View.AUTOFILL_HINT_CREDIT_CARD_SECURITY_CODE);
     } else if ("cc-exp".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_DATE);
+      setAutofillHints(view, View.AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_DATE);
     } else if ("cc-exp-month".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_MONTH);
+      setAutofillHints(view, View.AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_MONTH);
     } else if ("cc-exp-year".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_YEAR);
+      setAutofillHints(view, View.AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_YEAR);
     } else if ("off".equals(autocomplete)) {
-      view.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+      setImportantForAutofill(view, View.IMPORTANT_FOR_AUTOFILL_NO);
     } else {
       throw new JSApplicationIllegalArgumentException("Invalid autocomplete option: " + autocomplete);
     }
@@ -613,13 +659,34 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
     checkPasswordType(view);
   }
 
+  // This prop temporarily takes both numbers and strings.
+  // Number values are deprecated and will be removed in a future release.
+  // See T46146267
   @ReactProp(name = "autoCapitalize")
-  public void setAutoCapitalize(ReactEditText view, int autoCapitalize) {
+  public void setAutoCapitalize(ReactEditText view, Dynamic autoCapitalize) {
+    int autoCapitalizeValue = InputType.TYPE_TEXT_FLAG_CAP_SENTENCES;
+
+    if (autoCapitalize.getType() == ReadableType.Number) {
+      autoCapitalizeValue = autoCapitalize.asInt();
+    } else if (autoCapitalize.getType() == ReadableType.String) {
+      final String autoCapitalizeStr = autoCapitalize.asString();
+
+      if (autoCapitalizeStr.equals("none")) {
+        autoCapitalizeValue = 0;
+      } else if (autoCapitalizeStr.equals("characters")) {
+        autoCapitalizeValue = InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS;
+      } else if (autoCapitalizeStr.equals("words")) {
+        autoCapitalizeValue = InputType.TYPE_TEXT_FLAG_CAP_WORDS;
+      } else if (autoCapitalizeStr.equals("sentences")) {
+        autoCapitalizeValue = InputType.TYPE_TEXT_FLAG_CAP_SENTENCES;
+      }
+    }
+
     updateStagedInputTypeFlag(
         view,
         InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_CAP_WORDS |
             InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS,
-        autoCapitalize);
+      autoCapitalizeValue);
   }
 
   @ReactProp(name = "keyboardType")
@@ -687,6 +754,12 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
   public void setBorderStyle(ReactEditText view, @Nullable String borderStyle) {
     view.setBorderStyle(borderStyle);
   }
+
+  @ReactProp(name = "showSoftInputOnFocus", defaultBoolean = true)
+  public void showKeyboardOnFocus(ReactEditText view, boolean showKeyboardOnFocus) {
+    view.setShowSoftInputOnFocus(showKeyboardOnFocus);
+  }
+
 
   @ReactPropGroup(names = {
       ViewProps.BORDER_WIDTH,
@@ -867,6 +940,12 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
 
               // Prevent default behavior except when we want it to insert a newline.
               return blurOnSubmit || !isMultiline;
+            } else if (actionId == EditorInfo.IME_ACTION_NEXT) {
+              View v1 = v.focusSearch(FOCUS_FORWARD);
+              if (v1 != null && !v.requestFocus(FOCUS_FORWARD)) {
+                return true;
+              }
+              return false;
             }
 
             return true;
@@ -930,16 +1009,22 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
       // Android will call us back for both the SELECTION_START span and SELECTION_END span in text
       // To prevent double calling back into js we cache the result of the previous call and only
       // forward it on if we have new values
-      if (mPreviousSelectionStart != start || mPreviousSelectionEnd != end) {
+
+      // Apparently Android might call this with an end value that is less than the start value
+      // Lets normalize them. See https://github.com/facebook/react-native/issues/18579
+      int realStart = Math.min(start, end);
+      int realEnd = Math.max(start, end);
+
+      if (mPreviousSelectionStart != realStart || mPreviousSelectionEnd != realEnd) {
         mEventDispatcher.dispatchEvent(
             new ReactTextInputSelectionEvent(
                 mReactEditText.getId(),
-                start,
-                end
+                realStart,
+                realEnd
             ));
 
-        mPreviousSelectionStart = start;
-        mPreviousSelectionEnd = end;
+        mPreviousSelectionStart = realStart;
+        mPreviousSelectionEnd = realEnd;
       }
     }
   }
