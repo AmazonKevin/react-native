@@ -53,6 +53,8 @@ const OVERRIDE_PROPS = [
   'accessibilityRole',
   'accessibilityStates',
   'accessibilityState',
+  'accessibilityActions',
+  'onAccessibilityAction',
   'hitSlop',
   'nativeID',
   'onBlur',
@@ -67,8 +69,6 @@ export type Props = $ReadOnly<{|
   accessibilityHint?: ?Stringish,
   accessibilityIgnoresInvertColors?: ?boolean,
   accessibilityRole?: ?AccessibilityRole,
-  accessibilityStates?: ?AccessibilityStates,
-  accessibilityState?: ?AccessibilityState,
   children?: ?React.Node,
   delayLongPress?: ?number,
   delayPressIn?: ?number,
@@ -264,6 +264,8 @@ const TouchableWithoutFeedback = ((createReactClass({
       accessible: this.props.accessible !== false,
       focusable:
         this.props.focusable !== false && this.props.onPress !== undefined,
+      clickable:
+        this.props.clickable !== false && this.props.onPress !== undefined,
       onClick: this.touchableHandlePress,
       onStartShouldSetResponder: this.touchableHandleStartShouldSetResponder,
       onResponderTerminationRequest: this
