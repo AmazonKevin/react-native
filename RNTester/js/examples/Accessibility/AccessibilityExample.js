@@ -503,7 +503,9 @@ class AccessibilityActionsExample extends React.Component {
             }}
             onPress={() => Alert.alert('Button has been pressed!')}
             accessibilityRole="button">
-            <Text>Click me</Text>
+            <View >
+              <Text>Click me</Text>
+            </View>
           </TouchableWithoutFeedback>
         </RNTesterBlock>
 
