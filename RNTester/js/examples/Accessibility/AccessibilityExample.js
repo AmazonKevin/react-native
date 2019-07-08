@@ -16,6 +16,7 @@ const {
   Text,
   View,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Alert,
   UIManager,
   findNodeHandle,
@@ -436,7 +437,7 @@ class AccessibilityActionsExample extends React.Component {
         </RNTesterBlock>
 
         <RNTesterBlock title="View with multiple actions">
-          <View
+          <TouchableOpacity
             accessible={true}
             accessibilityActions={[
               {name: 'cut', label: 'cut label'},
@@ -457,7 +458,7 @@ class AccessibilityActionsExample extends React.Component {
               }
             }}>
             <Text>This view supports many actions.</Text>
-          </View>
+          </TouchableOpacity>
         </RNTesterBlock>
 
         <RNTesterBlock title="Adjustable with increment/decrement actions">
@@ -480,7 +481,7 @@ class AccessibilityActionsExample extends React.Component {
         </RNTesterBlock>
 
         <RNTesterBlock title="Button with custom accessibility actions">
-          <TouchableOpacity
+          <TouchableWithoutFeedback 
             accessible={true}
             accessibilityActions={[
               {name: 'cut', label: 'cut label'},
@@ -502,8 +503,10 @@ class AccessibilityActionsExample extends React.Component {
             }}
             onPress={() => Alert.alert('Button has been pressed!')}
             accessibilityRole="button">
-            <Text>Click me</Text>
-          </TouchableOpacity>
+            <View >
+              <Text>Click me</Text>
+            </View>
+          </TouchableWithoutFeedback>
         </RNTesterBlock>
 
       </View>
