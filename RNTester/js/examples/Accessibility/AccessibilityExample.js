@@ -437,7 +437,7 @@ class AccessibilityActionsExample extends React.Component {
         </RNTesterBlock>
 
         <RNTesterBlock title="View with multiple actions">
-          <TouchableOpacity
+          <View
             accessible={true}
             accessibilityActions={[
               {name: 'cut', label: 'cut label'},
@@ -458,7 +458,7 @@ class AccessibilityActionsExample extends React.Component {
               }
             }}>
             <Text>This view supports many actions.</Text>
-          </TouchableOpacity>
+          </View>
         </RNTesterBlock>
 
         <RNTesterBlock title="Adjustable with increment/decrement actions">
