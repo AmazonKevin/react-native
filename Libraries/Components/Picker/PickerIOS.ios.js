@@ -47,6 +47,7 @@ type RCTPickerIOSType = Class<
       selectedIndex: number,
       style?: ?TextStyleProp,
       testID?: ?string,
+      accessibilityLabel?: ?string,
     |}>,
   >,
 >;
@@ -60,6 +61,7 @@ type Props = $ReadOnly<{|
   onChange?: ?(event: PickerIOSChangeEvent) => mixed,
   onValueChange?: ?(itemValue: string | number, itemIndex: number) => mixed,
   selectedValue: ?(number | string),
+  accessibilityLabel?: ?string,
 |}>;
 
 type State = {|
@@ -117,6 +119,7 @@ class PickerIOS extends React.Component<Props, State> {
           items={this.state.items}
           selectedIndex={this.state.selectedIndex}
           onChange={this._onChange}
+          accessibilityLabel={this.props.accessibilityLabel}
         />
       </View>
     );

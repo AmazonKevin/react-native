@@ -38,6 +38,7 @@ type RCTPickerIOSType = Class<
       selectedIndex: number,
       style?: ?TextStyleProp,
       testID?: ?string,
+      accessibilityLabel?: ?string,
     |}>,
   >,
 >;
